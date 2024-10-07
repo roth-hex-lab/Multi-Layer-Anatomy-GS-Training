@@ -52,8 +52,11 @@ class ModelParams(ParamGroup):
         self._images = "images"
         self._resolution = -1
         self._white_background = False
+        self._flatten_alpha = False
+        self._alpha_train = False
         self.data_device = "cuda"
         self.eval = False
+        self.antialiasing = False
         super().__init__(parser, "Loading Parameters", sentinel)
 
     def extract(self, args):
@@ -86,6 +89,8 @@ class OptimizationParams(ParamGroup):
         self.densify_from_iter = 500
         self.densify_until_iter = 15_000
         self.densify_grad_threshold = 0.0002
+        self.inactive_purge_threshold = 0.015
+        self.inactive_purge_decay = 0.975
         self.random_background = False
         super().__init__(parser, "Optimization Parameters")
 

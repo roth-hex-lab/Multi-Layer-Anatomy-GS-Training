@@ -9,8 +9,10 @@
 # For inquiries contact  george.drettakis@inria.fr
 #
 
+import math
 from pathlib import Path
 import os
+import statistics
 from PIL import Image
 import torch
 import torchvision.transforms.functional as tf
@@ -26,10 +28,14 @@ def readImages(renders_dir, gt_dir):
     gts = []
     image_names = []
     for fname in os.listdir(renders_dir):
-        render = Image.open(renders_dir / fname)
-        gt = Image.open(gt_dir / fname)
-        renders.append(tf.to_tensor(render).unsqueeze(0)[:, :3, :, :].cuda())
-        gts.append(tf.to_tensor(gt).unsqueeze(0)[:, :3, :, :].cuda())
+        #render = Image.open(renders_dir / fname)
+        #gt = Image.open(gt_dir / fname)
+        #renders.append(tf.to_tensor(render).unsqueeze(0)[:, :3, :, :].cuda())
+        #gts.append(tf.to_tensor(gt).unsqueeze(0)[:, :3, :, :].cuda())
+        
+        # Load on demand
+        renders.append(renders_dir / fname)
+        gts.append(gt_dir / fname)
         image_names.append(fname)
     return renders, gts, image_names
 
@@ -42,55 +48,80 @@ def evaluate(model_paths):
     print("")
 
     for scene_dir in model_paths:
-        try:
-            print("Scene:", scene_dir)
-            full_dict[scene_dir] = {}
-            per_view_dict[scene_dir] = {}
-            full_dict_polytopeonly[scene_dir] = {}
-            per_view_dict_polytopeonly[scene_dir] = {}
+    
+        print("Scene:", scene_dir)
+        full_dict[scene_dir] = {}
+        per_view_dict[scene_dir] = {}
+        full_dict_polytopeonly[scene_dir] = {}
+        per_view_dict_polytopeonly[scene_dir] = {}
 
-            test_dir = Path(scene_dir) / "test"
+        test_dir = Path(scene_dir) / "test"
 
-            for method in os.listdir(test_dir):
-                print("Method:", method)
+        for method in os.listdir(test_dir):
+            print("Method:", method)
 
-                full_dict[scene_dir][method] = {}
-                per_view_dict[scene_dir][method] = {}
-                full_dict_polytopeonly[scene_dir][method] = {}
-                per_view_dict_polytopeonly[scene_dir][method] = {}
+            full_dict[scene_dir][method] = {}
+            per_view_dict[scene_dir][method] = {}
+            full_dict_polytopeonly[scene_dir][method] = {}
+            per_view_dict_polytopeonly[scene_dir][method] = {}
 
-                method_dir = test_dir / method
-                gt_dir = method_dir/ "gt"
-                renders_dir = method_dir / "renders"
-                renders, gts, image_names = readImages(renders_dir, gt_dir)
+            method_dir = test_dir / method
+            gt_dir = method_dir/ "gt"
+            renders_dir = method_dir / "renders"
+            renders, gts, image_names = readImages(renders_dir, gt_dir)
 
-                ssims = []
-                psnrs = []
-                lpipss = []
+            ssims = []
+            psnrs = []
+            lpipss = []
 
-                for idx in tqdm(range(len(renders)), desc="Metric evaluation progress"):
-                    ssims.append(ssim(renders[idx], gts[idx]))
-                    psnrs.append(psnr(renders[idx], gts[idx]))
-                    lpipss.append(lpips(renders[idx], gts[idx], net_type='vgg'))
+            skiptcount = 0
 
-                print("  SSIM : {:>12.7f}".format(torch.tensor(ssims).mean(), ".5"))
-                print("  PSNR : {:>12.7f}".format(torch.tensor(psnrs).mean(), ".5"))
-                print("  LPIPS: {:>12.7f}".format(torch.tensor(lpipss).mean(), ".5"))
-                print("")
+            for idx in tqdm(range(len(renders)), desc="Metric evaluation progress"):
+                render_img = Image.open(renders[idx]).convert("RGBA").convert("RGB")
+                gt_img = Image.open(gts[idx]).convert("RGBA").convert("RGB")
+                render = tf.to_tensor(render_img).unsqueeze(0).cuda()
+                gt = tf.to_tensor(gt_img).unsqueeze(0).cuda()
 
-                full_dict[scene_dir][method].update({"SSIM": torch.tensor(ssims).mean().item(),
-                                                        "PSNR": torch.tensor(psnrs).mean().item(),
-                                                        "LPIPS": torch.tensor(lpipss).mean().item()})
-                per_view_dict[scene_dir][method].update({"SSIM": {name: ssim for ssim, name in zip(torch.tensor(ssims).tolist(), image_names)},
-                                                            "PSNR": {name: psnr for psnr, name in zip(torch.tensor(psnrs).tolist(), image_names)},
-                                                            "LPIPS": {name: lp for lp, name in zip(torch.tensor(lpipss).tolist(), image_names)}})
+                psnr_score = psnr(render, gt)
+                if not math.isfinite(psnr_score.item()) or psnr_score.item() > 75:
+                    skiptcount += 1
+                    continue
 
-            with open(scene_dir + "/results.json", 'w') as fp:
-                json.dump(full_dict[scene_dir], fp, indent=True)
-            with open(scene_dir + "/per_view.json", 'w') as fp:
-                json.dump(per_view_dict[scene_dir], fp, indent=True)
-        except:
-            print("Unable to compute metrics for model", scene_dir)
+                ssims.append(ssim(render, gt))
+                psnrs.append(psnr_score)
+                lpipss.append(lpips(render, gt, net_type='vgg'))
+                
+            print(f"Skipped {skiptcount} empty images")
+
+            ssim_stdev = 0
+            psnr_stdev = 0
+            lpips_stdev = 0
+            if len(ssims) > 1:
+                ssim_stdev = statistics.stdev([ele.item() for ele in ssims])
+                psnr_stdev = statistics.stdev([ele.item() for ele in psnrs])
+                lpips_stdev = statistics.stdev([ele.item() for ele in lpipss])
+
+
+            print(f"  SSIM : {torch.tensor(ssims).mean():>10.5f}±{ssim_stdev:.5f}")
+            print(f"  PSNR : {torch.tensor(psnrs).mean():>10.5f}±{psnr_stdev:.5f}")
+            print(f"  LPIPS: {torch.tensor(lpipss).mean():>10.5f}±{lpips_stdev:.5f}")
+            print("")
+
+            full_dict[scene_dir][method].update({"SSIM": torch.tensor(ssims).mean().item(),
+                                                    "PSNR": torch.tensor(psnrs).mean().item(),
+                                                    "LPIPS": torch.tensor(lpipss).mean().item(),
+                                                    "SSIM_STDEV": ssim_stdev,
+                                                    "PSNR_STDEV": psnr_stdev,
+                                                    "LPIPS_STDEV": lpips_stdev})
+            per_view_dict[scene_dir][method].update({"SSIM": {name: ssim for ssim, name in zip(torch.tensor(ssims).tolist(), image_names)},
+                                                        "PSNR": {name: psnr for psnr, name in zip(torch.tensor(psnrs).tolist(), image_names)},
+                                                        "LPIPS": {name: lp for lp, name in zip(torch.tensor(lpipss).tolist(), image_names)}})
+
+        with open(scene_dir + "/results.json", 'w') as fp:
+            json.dump(full_dict[scene_dir], fp, indent=True)
+        with open(scene_dir + "/per_view.json", 'w') as fp:
+            json.dump(per_view_dict[scene_dir], fp, indent=True)
+
 
 if __name__ == "__main__":
     device = torch.device("cuda:0")

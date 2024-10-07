@@ -15,16 +15,21 @@ from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianR
 from scene.gaussian_model import GaussianModel
 from utils.sh_utils import eval_sh
 
-def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None):
+def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None, only_active_level = False, antialiasing = False):
     """
     Render the scene. 
     
     Background tensor (bg_color) must be on GPU!
+
+    TODO: Python cov3d and SH support with layers
     """
  
     # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
+    screenspace_points_all = torch.zeros_like(pc.get_xyz_all, dtype=pc.get_xyz_all.dtype, requires_grad=True, device="cuda") + 0
     screenspace_points = torch.zeros_like(pc.get_xyz, dtype=pc.get_xyz.dtype, requires_grad=True, device="cuda") + 0
+
     try:
+        screenspace_points_all.retain_grad()
         screenspace_points.retain_grad()
     except:
         pass
@@ -45,14 +50,15 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
         sh_degree=pc.active_sh_degree,
         campos=viewpoint_camera.camera_center,
         prefiltered=False,
-        debug=pipe.debug
+        debug=pipe.debug,
+        antialiasing=antialiasing
     )
 
     rasterizer = GaussianRasterizer(raster_settings=raster_settings)
 
-    means3D = pc.get_xyz
-    means2D = screenspace_points
-    opacity = pc.get_opacity
+    means3D = pc.get_xyz if only_active_level else pc.get_xyz_all
+    means2D = screenspace_points if only_active_level else screenspace_points_all
+    opacity = pc.get_opacity if only_active_level else pc.get_opacity_all
 
     # If precomputed 3d covariance is provided, use it. If not, then it will be computed from
     # scaling / rotation by the rasterizer.
@@ -62,8 +68,8 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
     if pipe.compute_cov3D_python:
         cov3D_precomp = pc.get_covariance(scaling_modifier)
     else:
-        scales = pc.get_scaling
-        rotations = pc.get_rotation
+        scales = pc.get_scaling if only_active_level else pc.get_scaling_all
+        rotations = pc.get_rotation if only_active_level else pc.get_rotation_all
 
     # If precomputed colors are provided, use them. Otherwise, if it is desired to precompute colors
     # from SHs in Python, do it. If not, then SH -> RGB conversion will be done by rasterizer.
@@ -77,12 +83,12 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
             sh2rgb = eval_sh(pc.active_sh_degree, shs_view, dir_pp_normalized)
             colors_precomp = torch.clamp_min(sh2rgb + 0.5, 0.0)
         else:
-            shs = pc.get_features
+            shs = pc.get_features if only_active_level else pc.get_features_all
     else:
         colors_precomp = override_color
 
     # Rasterize visible Gaussians to image, obtain their radii (on screen). 
-    rendered_image, radii = rasterizer(
+    rendered_image, radii, depth, accumulation = rasterizer(
         means3D = means3D,
         means2D = means2D,
         shs = shs,
@@ -91,10 +97,19 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
         scales = scales,
         rotations = rotations,
         cov3D_precomp = cov3D_precomp)
+    
+    # Get subset for actively trained level
+    radii_all = radii
+    radii = radii_all.split(pc.get_xyz.shape[0])[0]
 
     # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
     # They will be excluded from value updates used in the splitting criteria.
     return {"render": rendered_image,
             "viewspace_points": screenspace_points,
+            "viewspace_points_all": screenspace_points_all,
             "visibility_filter" : radii > 0,
-            "radii": radii}
+            "visibility_filter_all" : radii_all > 0,
+            "radii": radii,
+            "radii_all": radii_all,
+            "accumulation": accumulation,
+            "depth": depth}

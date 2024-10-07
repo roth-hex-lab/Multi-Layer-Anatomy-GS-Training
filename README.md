@@ -1,3 +1,49 @@
+# Multi-Layer 3D Gaussian Splatting
+
+This is the training code for **Multi-Layer Gaussian Splatting for Immersive Anatomy Visualization**. The repository builds on the original code for 3D Gaussian Splatting and reuses most of it. You can find the original readme below.
+
+This work extends the original 3D GS training with a layering approach. Layers function as 3D background during training, and are included in the final point cloud. A viewer can then selectively view and cut through layers to create more enganging views.We add the option to load and saves layers while training. We also improve loading of images with transparent backgrounds, and incorporate the alpha channel in the training process. We further add inactive pruning to remove inactive Gaussians introduced in the layering process.
+
+Each layer is trainined in its own training run. Consecutive training runs then load the saved layer output from previous runs.
+
+
+## Installation
+
+The installation mostly follows the original 3D GS installation procedure. We further need to apply a patch to add functionality to the `diff-gaussian-rasterization` submodule. 
+
+1. Follow the installation as described below. 
+2. Apply `pyth.diff` with `patch -p < patch.diff` in this folder
+
+You should be good to go.
+
+
+## Usage
+
+Training works as normal in 3D GS. Use the following to commands to save and load layers during training:
+
+```shell
+--save_layer
+--load_layer path_to_layer
+```
+
+Layers are saved at the same time as the trained point cloud and stored in the training folder as `layer_save_<iteration>.pth`.
+
+
+You can further enable alpha training and randomized background (both recommended for images with transparency) with `-a` and `--random_background`.
+
+You can also fine tune the inactive pruning. The defaults should be fine for most scenes, but can be chanced by adjusting `-inactive_purge_threshold <threshold>` (defaults to *0.015*) and `--inactive_purge_decay <decay>` (defaults to *0.975*).
+
+
+<br>
+<br>
+<br>
+---
+<br>
+<br>
+<br>
+
+
+
 # 3D Gaussian Splatting for Real-Time Radiance Field Rendering
 Bernhard Kerbl*, Georgios Kopanas*, Thomas Leimkühler, George Drettakis (* indicates equal contribution)<br>
 | [Webpage](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/) | [Full Paper](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/3d_gaussian_splatting_high.pdf) | [Video](https://youtu.be/T_kXY43VZnk) | [Other GRAPHDECO Publications](http://www-sop.inria.fr/reves/publis/gdindex.php) | [FUNGRAPH project page](https://fungraph.inria.fr) |<br>

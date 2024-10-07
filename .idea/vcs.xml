@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/SIBR_viewers" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/SIBR_viewers/extlibs/CudaRasterizer/CudaRasterizer" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/SIBR_viewers/extlibs/CudaRasterizer/CudaRasterizer/third_party/glm" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/SIBR_viewers/extlibs/imgui/imgui" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/SIBR_viewers/extlibs/mrf/mrf" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/SIBR_viewers/extlibs/nanoflann/nanoflann" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/SIBR_viewers/extlibs/nativefiledialog/nativefiledialog" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/SIBR_viewers/extlibs/picojson/picojson" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/SIBR_viewers/extlibs/rapidxml/rapidxml" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/SIBR_viewers/extlibs/xatlas/xatlas" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/submodules/diff-gaussian-rasterization" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/submodules/diff-gaussian-rasterization/third_party/glm" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/submodules/simple-knn" vcs="Git" />
+  </component>
+</project>
