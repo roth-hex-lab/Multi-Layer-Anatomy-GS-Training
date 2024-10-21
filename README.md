@@ -1,6 +1,6 @@
 # Multi-Layer 3D Gaussian Splatting
 
-This is the training code for **Multi-Layer Gaussian Splatting for Immersive Anatomy Visualization**. The repository builds on the original code for 3D Gaussian Splatting and reuses most of it. You can find the original readme below. See the other repositories related to this work here: https://github.com/roth-hex-lab/Multi-Layer-Anatomy-GS-Unity-Rendering
+This is the training code for **Multi-Layer Gaussian Splatting for Immersive Anatomy Visualization**. The repository builds on the original code for 3D Gaussian Splatting and reuses most of it. You can find the original readme below. See the other repositories related to this work here: https://github.com/roth-hex-lab/Multi-Layer-Gaussian-Splatting-for-Immersive-Anatomy-Visualization
 
 This work extends the original 3D GS training with a layering approach. Layers function as 3D background during training, and are included in the final point cloud. A viewer can then selectively view and cut through layers to create more enganging views.We add the option to load and saves layers while training. We also improve loading of images with transparent backgrounds, and incorporate the alpha channel in the training process. We further add inactive pruning to remove inactive Gaussians introduced in the layering process.
 
